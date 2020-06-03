@@ -9,5 +9,5 @@ void Barrier::wait() {
 }
 
 Barrier::~Barrier() {
-
+//
 }
