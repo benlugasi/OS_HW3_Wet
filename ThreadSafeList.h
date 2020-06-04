@@ -17,22 +17,6 @@ class List
             while(head->next)
                 remove(head->next->data);
             delete head;
-           /*
-
-            Node* pred = head->next,* curr = nullptr;
-            if(pred){
-                curr = pred->next;
-                curr->lock();
-            }
-            while(curr){
-                remove(pred->data);
-                pred->unlock();
-                pred=curr;
-                curr=curr->next;
-                if(curr) curr->lock();
-            }
-            head->lock();
-            delete head;*/
         }
 
         class Node {
@@ -49,15 +33,20 @@ class List
           };
           Node(Node&)= delete;
           Node& operator=(Node&)= delete;
-          void lock(){pthread_mutex_lock(&mutex);};
-          void unlock(){pthread_mutex_unlock(&mutex);};
+          void lock(){
+              //cout<<"Lock "<<data<<endl;
+              pthread_mutex_lock(&mutex);
+          };
+          void unlock(){
+              //cout<<"Unlock "<<data<<endl;
+              pthread_mutex_unlock(&mutex);};
           void insert_after(const T& data_in){next= new Node(data_in, next);}
           bool last() const {return next==nullptr;}
-          void remove(Node* pred);
+          //void remove(Node* pred);
 
         };
 
-
+/*
         class ReturnVal : std::exception{
         public:
             bool val;
@@ -70,7 +59,7 @@ class List
         class Failure : ReturnVal{
         public:
             Failure() : ReturnVal(false){};
-        };
+        };*/
 
         /**
          * Insert new node to list while keeping the list ordered in an ascending order
@@ -79,9 +68,10 @@ class List
          * @return true if a new node was added and false otherwise
          */
         bool insert(const T& data) {
+            //cout<<"----Insert "<<data<<endl;
             Node *pred= nullptr, *cur=head;
             cur->lock();
-            try {
+            //try {
 
                 while (true){
                     hand_over_hand(&pred, &cur);
@@ -93,19 +83,27 @@ class List
                     //   cur is tail       pred is dummy
                     if (cur == nullptr || ((pred == head || data > pred->data) && data < cur->data)) {
                         pred->insert_after(data);
-                        throw ReturnVal(true);
+                        __insert_test_hook();
+                        if(pred) pred->unlock();
+                        if(cur) cur->unlock();
+                        return true;
+                        //throw ReturnVal(true);
                     }
 
-                    else if (data == cur->data)
-                         throw ReturnVal(false);
+                    else if (data == cur->data) {
+                        if (pred) pred->unlock();
+                        if (cur) cur->unlock();
+                        return false;
+                        //throw ReturnVal(false);
+                    }
                 }
 
-            }
+            /*}
             catch(ReturnVal& r){
                 if(pred) pred->unlock();
                 if(cur) cur->unlock();
                 return r.val;
-            }
+            }*/
 
         }
 
@@ -121,13 +119,11 @@ class List
                 if (curr->data == value) {
                     pred->next = curr->next;
                     delete curr;
+                    __remove_test_hook();
                     pred->unlock();
                     return true;
                 }
-                pred->unlock();
-                pred = curr;
-                curr = curr->next;
-                if (curr) curr->lock();
+                hand_over_hand(&pred, &curr);
             }
             pred->unlock();
             return false;
@@ -144,11 +140,9 @@ class List
             pred->lock();
             while(curr){
                 size++;
-                pred->unlock();
-                pred=curr;
-                curr=curr->next;
-                if(curr) curr->lock();
+                hand_over_hand(&pred, &curr);
             }
+            if(pred) pred->unlock();
 			return size;
         }
 
@@ -174,6 +168,7 @@ class List
           }
           cout << endl;
         }
+
 
 		// Don't remove
         virtual void __insert_test_hook() {}
