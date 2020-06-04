@@ -19,14 +19,22 @@ class List
           T data;
           Node *next;
           pthread_mutex_t mutex;
-          explicit Node(T data, Node *next= nullptr) : data(data), next(next), mutex(PTHREAD_MUTEX_INITIALIZER){}
+          explicit Node(T data, Node *next= nullptr) : data(data), next(next){
+              pthread_mutex_init(&mutex);
+              lock();
+          }
           ~Node()= default;
           Node(Node&)= delete;
           Node& operator=(Node&)= delete;
           void lock(){pthread_mutex_lock(&mutex);};
           void unlock(){pthread_mutex_unlock(&mutex);};
-          void insert_after(const T& data);
-          void remove_after(const T& data);
+          void insert_before(Node* pred, const T& data_in){
+              //if head
+              auto n= new Node(data_in, pred->next);
+              pred->next=n;
+          }
+          void remove(Node* pred);
+
         };
 
         /**
@@ -36,6 +44,16 @@ class List
          * @return true if a new node was added and false otherwise
          */
         bool insert(const T& data) {
+            Node* pred= nullptr, cur=head;
+            cur->lock();
+            while(cur){
+
+                if(data>pred->data && data<cur->data){
+                    cur.insert_before(pred, data);
+                }
+                hand_over_hand(&pred, &cur);
+            }
+
 			return false;
         }
 
@@ -85,9 +103,21 @@ class List
 		// Don't remove
         virtual void __remove_test_hook() {}
 
+        static void hand_over_hand(List<T>::Node **pred, List<T>::Node **cur);
+
     private:
         Node* head;
     // TODO: Add your own methods and data members
 };
+
+template<typename T>
+void List<T>::hand_over_hand(List<T>::Node **pred, List<T>::Node **cur) {
+    (*pred)->unlock();
+    *pred=*cur;
+    *cur=(*cur)->next;
+    (*cur)->lock();
+}
+
+
 
 #endif //THREAD_SAFE_LIST_H_
