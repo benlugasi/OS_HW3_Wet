@@ -11,21 +11,22 @@ template <typename T>
 class List 
 {
     public:
-        /**
-         * Constructor
-         */
-        List() { //TODO: add your implementation }
-
-        /**
-         * Destructor
-         */
-        ~List(){ //TODO: add your implementation }
+        List() {}
+        ~List(){}
 
         class Node {
          public:
           T data;
           Node *next;
-          // TODO: Add your methods and data members
+          pthread_mutex_t mutex;
+          explicit Node(T data, Node *next= nullptr) : data(data), next(next), mutex(PTHREAD_MUTEX_INITIALIZER){}
+          ~Node()= default;
+          Node(Node&)= delete;
+          Node& operator=(Node&)= delete;
+          void lock(){pthread_mutex_lock(&mutex);};
+          void unlock(){pthread_mutex_unlock(&mutex);};
+          void insert_after(const T& data);
+          void remove_after(const T& data);
         };
 
         /**
@@ -35,7 +36,7 @@ class List
          * @return true if a new node was added and false otherwise
          */
         bool insert(const T& data) {
-			//TODO: add your implementation
+			return false;
         }
 
         /**
@@ -44,7 +45,7 @@ class List
          * @return true if a matched node was found and removed and false otherwise
          */
         bool remove(const T& value) {
-			//TODO: add your implementation
+            return false;
         }
 
         /**
@@ -53,6 +54,7 @@ class List
          */
         unsigned int getSize() {
 			//TODO: add your implementation
+			return 0;
         }
 
 		// Don't remove
