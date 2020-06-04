@@ -48,8 +48,8 @@ void* ThreadHandler(void* thread_handler_args) {
     std::cout << "Thread number " << num << " has arrived (1)"  << std::endl;
     std::cout << "Status: " << (bari_t->is_close() ? "CLOSE" : "OPEN") << std::endl;
     bari_t->wait();
-    std::cout << "Status: " << (bari_t->is_close() ? "CLOSE" : "OPEN") << std::endl;
     std::cout << "Thread number " << num << " has arrived (2)"  << std::endl;
+    std::cout << "Status: " << (bari_t->is_close() ? "CLOSE" : "OPEN") << std::endl;
     free(recv_args);
     return NULL;
 }
