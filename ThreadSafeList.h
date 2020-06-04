@@ -11,8 +11,14 @@ template <typename T>
 class List 
 {
     public:
-        List() {}
+        List() : head(new Node(T(), nullptr)) {}
         ~List(){
+            head->lock();
+            while(head->next)
+                remove(head->next->data);
+            delete head;
+           /*
+
             Node* pred = head->next,* curr = nullptr;
             if(pred){
                 curr = pred->next;
@@ -26,7 +32,7 @@ class List
                 if(curr) curr->lock();
             }
             head->lock();
-            delete head;
+            delete head;*/
         }
 
         class Node {
@@ -35,8 +41,7 @@ class List
           Node *next;
           pthread_mutex_t mutex;
           explicit Node(T data, Node *next= nullptr) : data(data), next(next){
-              pthread_mutex_init(&mutex,NULL);
-              lock();
+              pthread_mutex_init(&mutex, NULL);
           }
           ~Node(){
               pthread_mutex_destroy(&mutex);
@@ -46,11 +51,25 @@ class List
           Node& operator=(Node&)= delete;
           void lock(){pthread_mutex_lock(&mutex);};
           void unlock(){pthread_mutex_unlock(&mutex);};
-          void insert_before(Node* pred, const T& data_in){
-              //if head
-              auto n= new Node(data_in, pred->next);
-              pred->next=n;
-          }
+          void insert_after(const T& data_in){next= new Node(data_in, next);}
+          bool last() const {return next==nullptr;}
+          void remove(Node* pred);
+
+        };
+
+
+        class ReturnVal : std::exception{
+        public:
+            bool val;
+            explicit ReturnVal(bool val) : val(val){};
+        };
+        class Success : ReturnVal{
+        public:
+            Success() : ReturnVal(true){};
+        };
+        class Failure : ReturnVal{
+        public:
+            Failure() : ReturnVal(false){};
         };
 
         /**
@@ -60,15 +79,34 @@ class List
          * @return true if a new node was added and false otherwise
          */
         bool insert(const T& data) {
-            Node* pred= nullptr, cur=head;
+            Node *pred= nullptr, *cur=head;
             cur->lock();
-            while(cur){
-                if(data>pred->data && data<cur->data){
-                    cur.insert_before(pred, data);
+            try {
+
+                while (true){
+                    hand_over_hand(&pred, &cur);
+
+                    //Case 1: reach lists end --> insert to tail
+                    //Case 2: need to replace head (pred is dummy and data<cur)
+                    //Case 3: normal --> prev<data<cur
+
+                    //   cur is tail       pred is dummy
+                    if (cur == nullptr || ((pred == head || data > pred->data) && data < cur->data)) {
+                        pred->insert_after(data);
+                        throw ReturnVal(true);
+                    }
+
+                    else if (data == cur->data)
+                         throw ReturnVal(false);
                 }
-                hand_over_hand(&pred, &cur);
+
             }
-			return false;
+            catch(ReturnVal& r){
+                if(pred) pred->unlock();
+                if(cur) cur->unlock();
+                return r.val;
+            }
+
         }
 
         /**
@@ -79,18 +117,21 @@ class List
         bool remove(const T& value) {
             Node* pred = head,* curr = head->next;
             pred->lock();
-            while(curr){
-                if(curr->data == value){
+            while (curr) {
+                if (curr->data == value) {
                     pred->next = curr->next;
                     delete curr;
+                    pred->unlock();
                     return true;
                 }
                 pred->unlock();
-                pred=curr;
-                curr=curr->next;
-                if(curr) curr->lock();
+                pred = curr;
+                curr = curr->next;
+                if (curr) curr->lock();
             }
+            pred->unlock();
             return false;
+
         }
 
         /**
@@ -113,8 +154,7 @@ class List
 
 		// Don't remove
         void print() {
-          Node* temp = NULL;
-          if(head) temp = head->next;
+          Node* temp = head->next;
           if (temp == NULL)
           {
             cout << "";
@@ -140,10 +180,22 @@ class List
 		// Don't remove
         virtual void __remove_test_hook() {}
 
+        static void hand_over_hand(List<T>::Node **pred, List<T>::Node **cur);
+
     private:
         Node* head;
     // TODO: Add your own methods and data members
 };
+
+template<typename T>
+void List<T>::hand_over_hand(List<T>::Node **pred, List<T>::Node **cur) {
+    if(*pred) (*pred)->unlock();
+    *pred=*cur;
+    *cur=(*cur)->next;
+    if(*cur) (*cur)->lock();
+
+}
+
 
 
 #endif //THREAD_SAFE_LIST_H_
