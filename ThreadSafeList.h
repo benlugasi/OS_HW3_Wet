@@ -12,7 +12,22 @@ class List
 {
     public:
         List() {}
-        ~List(){}
+        ~List(){
+            Node* pred = head->next,* curr = nullptr;
+            if(pred){
+                curr = pred->next;
+                curr->lock();
+            }
+            while(curr){
+                remove(pred->data);
+                pred->unlock();
+                pred=curr;
+                curr=curr->next;
+                if(curr) curr->lock();
+            }
+            head->lock();
+            delete head;
+        }
 
         class Node {
          public:
@@ -20,10 +35,13 @@ class List
           Node *next;
           pthread_mutex_t mutex;
           explicit Node(T data, Node *next= nullptr) : data(data), next(next){
-              pthread_mutex_init(&mutex);
+              pthread_mutex_init(&mutex,NULL);
               lock();
           }
-          ~Node()= default;
+          ~Node(){
+              pthread_mutex_destroy(&mutex);
+              unlock();
+          };
           Node(Node&)= delete;
           Node& operator=(Node&)= delete;
           void lock(){pthread_mutex_lock(&mutex);};
@@ -33,8 +51,6 @@ class List
               auto n= new Node(data_in, pred->next);
               pred->next=n;
           }
-          void remove(Node* pred);
-
         };
 
         /**
@@ -47,13 +63,11 @@ class List
             Node* pred= nullptr, cur=head;
             cur->lock();
             while(cur){
-
                 if(data>pred->data && data<cur->data){
                     cur.insert_before(pred, data);
                 }
                 hand_over_hand(&pred, &cur);
             }
-
 			return false;
         }
 
@@ -63,6 +77,19 @@ class List
          * @return true if a matched node was found and removed and false otherwise
          */
         bool remove(const T& value) {
+            Node* pred = head,* curr = head->next;
+            pred->lock();
+            while(curr){
+                if(curr->data == value){
+                    pred->next = curr->next;
+                    delete curr;
+                    return true;
+                }
+                pred->unlock();
+                pred=curr;
+                curr=curr->next;
+                if(curr) curr->lock();
+            }
             return false;
         }
 
@@ -71,13 +98,23 @@ class List
          * @return current size of the list
          */
         unsigned int getSize() {
-			//TODO: add your implementation
-			return 0;
+            unsigned int size = 0;
+            Node* pred = head,* curr = head->next;
+            pred->lock();
+            while(curr){
+                size++;
+                pred->unlock();
+                pred=curr;
+                curr=curr->next;
+                if(curr) curr->lock();
+            }
+			return size;
         }
 
 		// Don't remove
         void print() {
-          Node* temp = head;
+          Node* temp = NULL;
+          if(head) temp = head->next;
           if (temp == NULL)
           {
             cout << "";
@@ -103,21 +140,10 @@ class List
 		// Don't remove
         virtual void __remove_test_hook() {}
 
-        static void hand_over_hand(List<T>::Node **pred, List<T>::Node **cur);
-
     private:
         Node* head;
     // TODO: Add your own methods and data members
 };
-
-template<typename T>
-void List<T>::hand_over_hand(List<T>::Node **pred, List<T>::Node **cur) {
-    (*pred)->unlock();
-    *pred=*cur;
-    *cur=(*cur)->next;
-    (*cur)->lock();
-}
-
 
 
 #endif //THREAD_SAFE_LIST_H_
