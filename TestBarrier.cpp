@@ -43,8 +43,13 @@ void* ThreadHandler(void* thread_handler_args) {
     ThreadHandlerArgs* recv_args  = (ThreadHandlerArgs*)thread_handler_args;
     Barrier* bari_t = recv_args->barrier;
     int num = recv_args->num;
+    std::cout << "Status: " << (bari_t->is_close() ? "CLOSE" : "OPEN") << std::endl;
     bari_t->wait();
-    std::cout << "Thread number " << num << " has arrived"  << std::endl;
+    std::cout << "Thread number " << num << " has arrived (1)"  << std::endl;
+    std::cout << "Status: " << (bari_t->is_close() ? "CLOSE" : "OPEN") << std::endl;
+    bari_t->wait();
+    std::cout << "Status: " << (bari_t->is_close() ? "CLOSE" : "OPEN") << std::endl;
+    std::cout << "Thread number " << num << " has arrived (2)"  << std::endl;
     free(recv_args);
     return NULL;
 }
