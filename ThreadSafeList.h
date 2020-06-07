@@ -15,30 +15,23 @@ class Mutex{
     pthread_mutex_t mutex;
 public:
     Mutex(){pthread_mutex_init(&mutex, NULL);};
-    ~Mutex(){
-        unlock();
-        pthread_mutex_destroy(&mutex);
-    };
-    void lock(){
-        pthread_mutex_lock(&mutex);
-    };
-    void unlock(){
-        pthread_mutex_unlock(&mutex);
-    };
+    ~Mutex(){pthread_mutex_destroy(&mutex);};
+    void lock(){pthread_mutex_lock(&mutex);};
+    void unlock(){pthread_mutex_unlock(&mutex);};
 };
 
-class GlobalCounter{
+class Counter{
     Mutex mutex;
     unsigned int count;
 public:
-    GlobalCounter(): count(0){};
-    GlobalCounter operator++(int){
+    Counter(): count(0){};
+    Counter operator++(int){
         mutex.lock();
         count++;
         mutex.unlock();
         return *this;
     };
-    GlobalCounter operator--(int){
+    Counter operator--(int){
         mutex.lock();
         count--;
         mutex.unlock();
@@ -51,8 +44,6 @@ public:
         return count_t;
     };
 };
-
-
 
 template <typename T>
 class List 
@@ -114,7 +105,7 @@ class List
                 }
 
             if(retval) {
-                counter++;
+                size++;
                 __insert_test_hook();
             }
             UNLOCK(cur);
@@ -134,9 +125,10 @@ class List
             while (curr) {
                 if (curr->data == value) {
                     pred->next = curr->next;
+                    UNLOCK(curr);
                     delete curr;
                     __remove_test_hook();
-                    counter--;
+                    size--;
                     UNLOCK(pred);
                     return true;
                 }
@@ -151,8 +143,8 @@ class List
          * Returns the current size of the list
          * @return current size of the list
          */
-        unsigned int get_size() {
-            return counter.get();
+        unsigned int getSize() {
+            return size.get();
         }
 
 		// Don't remove
@@ -185,8 +177,14 @@ class List
                     return false;
             }
             return true;
-
         }
+
+        static void hand_over_hand(List<T>::Node **pred, List<T>::Node **cur){
+            UNLOCK(*pred);
+            *pred=*cur;
+            *cur=(*cur)->next;
+            LOCK(*cur);
+        };
 
 
 		// Don't remove
@@ -194,22 +192,10 @@ class List
 		// Don't remove
         virtual void __remove_test_hook() {}
 
-        static void hand_over_hand(List<T>::Node **pred, List<T>::Node **cur);
-
     private:
-        Node head;
-        GlobalCounter counter;
+        Node head; //dummy
+        Counter size;
 };
-
-template<typename T>
-void List<T>::hand_over_hand(List<T>::Node **pred, List<T>::Node **cur) {
-    UNLOCK(*pred);
-    *pred=*cur;
-    *cur=(*cur)->next;
-    LOCK(*cur);
-
-}
-
 
 
 #endif //THREAD_SAFE_LIST_H_
