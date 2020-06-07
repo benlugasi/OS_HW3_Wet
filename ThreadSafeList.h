@@ -7,6 +7,9 @@
 
 using namespace std;
 
+#define LOCK(node)     if((node)) (node)->lock()
+#define UNLOCK(node)   if((node)) (node)->unlock()
+
 template <typename T>
 class List 
 {
@@ -35,18 +38,25 @@ class List
               unlock();
           };
           Node(Node&)= delete;
+
           Node& operator=(Node&)= delete;
+
           void lock(){
-              //cout<<"Lock "<<data<<endl;
               pthread_mutex_lock(&mutex);
           };
           void unlock(){
-              //cout<<"Unlock "<<data<<endl;
-              pthread_mutex_unlock(&mutex);};
-          void insert_after(const T& data_in){next= new Node(data_in, next);}
-          bool last() const {return next==nullptr;}
-          //void remove(Node* pred);
+              pthread_mutex_unlock(&mutex);
+          };
 
+          bool insert_after(const T& data_in){
+              try {
+                  next = new Node(data_in, next);
+              }
+              catch(std::bad_alloc& e){
+                  return false;
+              }
+              return true;
+          }
         };
 
 /*
@@ -71,31 +81,30 @@ class List
          * @return true if a new node was added and false otherwise
          */
         bool insert(const T& data) {
-            Node *pred= nullptr, *cur=head;
-            cur->lock();
-            while (true){
-                hand_over_hand(&pred, &cur);
-                //Case 1: reach lists end --> insert to tail
-                //Case 2: need to replace head (pred is dummy and data<cur)
-                //Case 3: normal --> prev<data<cur
+            Node *pred= head, *cur=head->next;
+            LOCK(pred);
+            LOCK(cur);
+            bool retval=false;
+                while (pred){
+                    //Case 1: reach lists end --> insert to tail
+                    //Case 2: need to replace head (pred is dummy and data<cur)
+                    //Case 3: normal --> prev<data<cur
 
-                //cur is tail       pred is dummy
-                if (cur == nullptr || ((pred == head || data > pred->data) && data < cur->data)) {
-                    pred->insert_after(data);
-                    __insert_test_hook();
-                    pthread_mutex_lock(&size_lock);
-                    size++;
-                    pthread_mutex_unlock(&size_lock);
-                    if(pred) pred->unlock();
-                    if(cur) cur->unlock();
-                    return true;
+                    //   cur is tail       pred is dummy
+                    if (cur == nullptr || ((pred == head || data > pred->data) && data < cur->data)) {
+                        retval= pred->insert_after(data);
+                        break;
+                    }
+                    else if (data == cur->data) {
+                        break;
+                    }
+                    hand_over_hand(&pred, &cur);
                 }
-                else if (data == cur->data) {
-                    if (pred) pred->unlock();
-                    if (cur) cur->unlock();
-                    return false;
-                }
-            }
+
+            if(retval) __insert_test_hook();
+            UNLOCK(pred);
+            UNLOCK(cur);
+            return retval;
         }
 
         /**
@@ -172,10 +181,10 @@ class List
 
 template<typename T>
 void List<T>::hand_over_hand(List<T>::Node **pred, List<T>::Node **cur) {
-    if(*pred) (*pred)->unlock();
+    UNLOCK(*pred);
     *pred=*cur;
     *cur=(*cur)->next;
-    if(*cur) (*cur)->lock();
+    LOCK(*cur);
 
 }
 
