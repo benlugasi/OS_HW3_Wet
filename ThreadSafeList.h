@@ -11,12 +11,15 @@ template <typename T>
 class List 
 {
     public:
-        List() : head(new Node(T(), nullptr)) {}
+        List() : head(new Node(T(), nullptr)) {
+            pthread_mutex_init(&size_lock, NULL);
+        }
         ~List(){
             head->lock();
             while(head->next)
                 remove(head->next->data);
             delete head;
+            pthread_mutex_destroy(&size_lock);
         }
 
         class Node {
@@ -68,43 +71,31 @@ class List
          * @return true if a new node was added and false otherwise
          */
         bool insert(const T& data) {
-            //cout<<"----Insert "<<data<<endl;
             Node *pred= nullptr, *cur=head;
             cur->lock();
-            //try {
+            while (true){
+                hand_over_hand(&pred, &cur);
+                //Case 1: reach lists end --> insert to tail
+                //Case 2: need to replace head (pred is dummy and data<cur)
+                //Case 3: normal --> prev<data<cur
 
-                while (true){
-                    hand_over_hand(&pred, &cur);
-
-                    //Case 1: reach lists end --> insert to tail
-                    //Case 2: need to replace head (pred is dummy and data<cur)
-                    //Case 3: normal --> prev<data<cur
-
-                    //   cur is tail       pred is dummy
-                    if (cur == nullptr || ((pred == head || data > pred->data) && data < cur->data)) {
-                        pred->insert_after(data);
-                        __insert_test_hook();
-                        if(pred) pred->unlock();
-                        if(cur) cur->unlock();
-                        return true;
-                        //throw ReturnVal(true);
-                    }
-
-                    else if (data == cur->data) {
-                        if (pred) pred->unlock();
-                        if (cur) cur->unlock();
-                        return false;
-                        //throw ReturnVal(false);
-                    }
+                //cur is tail       pred is dummy
+                if (cur == nullptr || ((pred == head || data > pred->data) && data < cur->data)) {
+                    pred->insert_after(data);
+                    __insert_test_hook();
+                    pthread_mutex_lock(&size_lock);
+                    size++;
+                    pthread_mutex_unlock(&size_lock);
+                    if(pred) pred->unlock();
+                    if(cur) cur->unlock();
+                    return true;
                 }
-
-            /*}
-            catch(ReturnVal& r){
-                if(pred) pred->unlock();
-                if(cur) cur->unlock();
-                return r.val;
-            }*/
-
+                else if (data == cur->data) {
+                    if (pred) pred->unlock();
+                    if (cur) cur->unlock();
+                    return false;
+                }
+            }
         }
 
         /**
@@ -120,6 +111,9 @@ class List
                     pred->next = curr->next;
                     delete curr;
                     __remove_test_hook();
+                    pthread_mutex_lock(&size_lock);
+                    size--;
+                    pthread_mutex_unlock(&size_lock);
                     pred->unlock();
                     return true;
                 }
@@ -135,14 +129,6 @@ class List
          * @return current size of the list
          */
         unsigned int getSize() {
-            unsigned int size = 0;
-            Node* pred = head,* curr = head->next;
-            pred->lock();
-            while(curr){
-                size++;
-                hand_over_hand(&pred, &curr);
-            }
-            if(pred) pred->unlock();
 			return size;
         }
 
@@ -179,6 +165,8 @@ class List
 
     private:
         Node* head;
+        unsigned int size;
+        pthread_mutex_t size_lock;
     // TODO: Add your own methods and data members
 };
 
