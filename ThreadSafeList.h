@@ -7,8 +7,25 @@
 
 using namespace std;
 
-#define LOCK(node)     if((node)) (node)->lock()
-#define UNLOCK(node)   if((node)) (node)->unlock()
+#define LOCK(node)     if((node)) (node)->mutex.lock()
+#define UNLOCK(node)   if((node)) (node)->mutex.unlock()
+
+
+class Mutex{
+    pthread_mutex_t mutex;
+public:
+    Mutex(){pthread_mutex_init(&mutex, NULL);};
+    ~Mutex(){
+        unlock();
+        pthread_mutex_destroy(&mutex);
+    };
+    void lock(){
+        pthread_mutex_lock(&mutex);
+    };
+    void unlock(){
+        pthread_mutex_unlock(&mutex);
+    };
+};
 
 template <typename T>
 class List 
@@ -16,7 +33,7 @@ class List
     public:
         List()= default;
         ~List(){
-            head.lock();
+            LOCK(&head);
             while(head.next)
                 remove(head.next->data);
         }
@@ -25,26 +42,11 @@ class List
          public:
           T data;
           Node *next;
-          pthread_mutex_t mutex;
-          explicit Node(T data=T(), Node *next= nullptr) : data(data), next(next){
-              pthread_mutex_init(&mutex, NULL);
-          }
-          ~Node(){
-              unlock();
-              pthread_mutex_destroy(&mutex);
-
-          };
+          Mutex mutex;
+          explicit Node(T data=T(), Node *next= nullptr) : data(data), next(next){}
+          ~Node()= default;
           Node(Node&)= delete;
-
           Node& operator=(Node&)= delete;
-
-          void lock(){
-              pthread_mutex_lock(&mutex);
-          };
-          void unlock(){
-              pthread_mutex_unlock(&mutex);
-          };
-
           bool insert_after(const T& data_in){
               try {
                   next = new Node(data_in, next);
@@ -55,21 +57,6 @@ class List
               return true;
           }
         };
-
-/*
-        class ReturnVal : std::exception{
-        public:
-            bool val;
-            explicit ReturnVal(bool val) : val(val){};
-        };
-        class Success : ReturnVal{
-        public:
-            Success() : ReturnVal(true){};
-        };
-        class Failure : ReturnVal{
-        public:
-            Failure() : ReturnVal(false){};
-        };*/
 
         /**
          * Insert new node to list while keeping the list ordered in an ascending order
@@ -100,9 +87,9 @@ class List
 
             if(retval) {
                 __insert_test_hook();
-                pthread_mutex_lock(&size_lock);
+                size_lock.lock();
                 size++;
-                pthread_mutex_unlock(&size_lock);
+                size_lock.unlock();
             }
             UNLOCK(cur);
             UNLOCK(pred);
@@ -116,21 +103,22 @@ class List
          */
         bool remove(const T& value) {
             Node* pred = &head,* curr = head.next;
-            pred->lock();
+            LOCK(pred);
+            LOCK(curr);
             while (curr) {
                 if (curr->data == value) {
                     pred->next = curr->next;
                     delete curr;
                     __remove_test_hook();
-                    pthread_mutex_lock(&size_lock);
+                    size_lock.lock();
                     size--;
-                    pthread_mutex_unlock(&size_lock);
-                    pred->unlock();
+                    size_lock.unlock();
+                    UNLOCK(pred);
                     return true;
                 }
                 hand_over_hand(&pred, &curr);
             }
-            pred->unlock();
+            UNLOCK(pred);
             return false;
 
         }
@@ -140,9 +128,9 @@ class List
          * @return current size of the list
          */
         unsigned int getSize() {
-            pthread_mutex_lock(&size_lock);
+            size_lock.lock();
             unsigned int size_t = size;
-            pthread_mutex_unlock(&size_lock);
+            size_lock.unlock();
             return size_t;
         }
 
@@ -180,7 +168,7 @@ class List
     private:
         Node head;
         unsigned int size;
-        pthread_mutex_t size_lock;
+        Mutex size_lock;
 };
 
 template<typename T>
