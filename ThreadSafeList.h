@@ -14,15 +14,11 @@ template <typename T>
 class List 
 {
     public:
-        List() : head(new Node(T(), nullptr)) {
-            pthread_mutex_init(&size_lock, NULL);
-        }
+        List()= default;
         ~List(){
-            head->lock();
-            while(head->next)
-                remove(head->next->data);
-            delete head;
-            pthread_mutex_destroy(&size_lock);
+            head.lock();
+            while(head.next)
+                remove(head.next->data);
         }
 
         class Node {
@@ -30,12 +26,13 @@ class List
           T data;
           Node *next;
           pthread_mutex_t mutex;
-          explicit Node(T data, Node *next= nullptr) : data(data), next(next){
+          explicit Node(T data=T(), Node *next= nullptr) : data(data), next(next){
               pthread_mutex_init(&mutex, NULL);
           }
           ~Node(){
-              pthread_mutex_destroy(&mutex);
               unlock();
+              pthread_mutex_destroy(&mutex);
+
           };
           Node(Node&)= delete;
 
@@ -81,7 +78,7 @@ class List
          * @return true if a new node was added and false otherwise
          */
         bool insert(const T& data) {
-            Node *pred= head, *cur=head->next;
+            Node *pred= &head, *cur=head.next;
             LOCK(pred);
             LOCK(cur);
             bool retval=false;
@@ -91,7 +88,7 @@ class List
                     //Case 3: normal --> prev<data<cur
 
                     //   cur is tail       pred is dummy
-                    if (cur == nullptr || ((pred == head || data > pred->data) && data < cur->data)) {
+                    if (cur == nullptr || ((pred == &head || data > pred->data) && data < cur->data)) {
                         retval= pred->insert_after(data);
                         break;
                     }
@@ -107,8 +104,8 @@ class List
                 size++;
                 pthread_mutex_unlock(&size_lock);
             }
-            UNLOCK(pred);
             UNLOCK(cur);
+            UNLOCK(pred);
             return retval;
         }
 
@@ -118,7 +115,7 @@ class List
          * @return true if a matched node was found and removed and false otherwise
          */
         bool remove(const T& value) {
-            Node* pred = head,* curr = head->next;
+            Node* pred = &head,* curr = head.next;
             pred->lock();
             while (curr) {
                 if (curr->data == value) {
@@ -151,7 +148,7 @@ class List
 
 		// Don't remove
         void print() {
-          Node* temp = head->next;
+          Node* temp = head.next;
           if (temp == NULL)
           {
             cout << "";
@@ -181,10 +178,9 @@ class List
         static void hand_over_hand(List<T>::Node **pred, List<T>::Node **cur);
 
     private:
-        Node* head;
+        Node head;
         unsigned int size;
         pthread_mutex_t size_lock;
-    // TODO: Add your own methods and data members
 };
 
 template<typename T>
