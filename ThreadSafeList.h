@@ -101,7 +101,12 @@ class List
                     hand_over_hand(&pred, &cur);
                 }
 
-            if(retval) __insert_test_hook();
+            if(retval) {
+                __insert_test_hook();
+                pthread_mutex_lock(&size_lock);
+                size++;
+                pthread_mutex_unlock(&size_lock);
+            }
             UNLOCK(pred);
             UNLOCK(cur);
             return retval;
