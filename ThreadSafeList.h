@@ -27,6 +27,33 @@ public:
     };
 };
 
+class GlobalCounter{
+    Mutex mutex;
+    unsigned int count;
+public:
+    GlobalCounter(): count(0){};
+    GlobalCounter operator++(int){
+        mutex.lock();
+        count++;
+        mutex.unlock();
+        return *this;
+    };
+    GlobalCounter operator--(int){
+        mutex.lock();
+        count--;
+        mutex.unlock();
+        return *this;
+    };
+    unsigned int get(){
+        mutex.lock();
+        unsigned int count_t = count;
+        mutex.unlock();
+        return count_t;
+    };
+};
+
+
+
 template <typename T>
 class List 
 {
@@ -56,6 +83,7 @@ class List
               }
               return true;
           }
+
         };
 
         /**
@@ -86,10 +114,8 @@ class List
                 }
 
             if(retval) {
+                counter++;
                 __insert_test_hook();
-                size_lock.lock();
-                size++;
-                size_lock.unlock();
             }
             UNLOCK(cur);
             UNLOCK(pred);
@@ -110,9 +136,7 @@ class List
                     pred->next = curr->next;
                     delete curr;
                     __remove_test_hook();
-                    size_lock.lock();
-                    size--;
-                    size_lock.unlock();
+                    counter--;
                     UNLOCK(pred);
                     return true;
                 }
@@ -127,11 +151,8 @@ class List
          * Returns the current size of the list
          * @return current size of the list
          */
-        unsigned int getSize() {
-            size_lock.lock();
-            unsigned int size_t = size;
-            size_lock.unlock();
-            return size_t;
+        unsigned int get_size() {
+            return counter.get();
         }
 
 		// Don't remove
@@ -157,6 +178,16 @@ class List
           cout << endl;
         }
 
+        bool isSorted(){
+            Node* temp = head.next;
+            while (temp->next != NULL) {
+                if(temp->data>temp->next->data)
+                    return false;
+            }
+            return true;
+
+        }
+
 
 		// Don't remove
         virtual void __insert_test_hook() {}
@@ -167,8 +198,7 @@ class List
 
     private:
         Node head;
-        unsigned int size;
-        Mutex size_lock;
+        GlobalCounter counter;
 };
 
 template<typename T>

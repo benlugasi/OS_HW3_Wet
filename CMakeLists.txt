@@ -6,5 +6,5 @@ set(CMAKE_CXX_FLAGS "--std=c++11 -pthread -Wall -pedantic -Werror -fPIC -pthread
 add_executable(hw3_wet
         Barrier.cpp
         #TestBarrier.cpp
-        testListHooks.cpp
+        tests/HeavyThreadsTest.cpp
         )

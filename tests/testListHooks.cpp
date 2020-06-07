@@ -1,4 +1,4 @@
-#include "ThreadSafeList.h"
+#include "../ThreadSafeList.h"
 #include <iostream>
 #include <assert.h>
 using namespace std;
@@ -32,7 +32,7 @@ int main() {
     l->insert(i);
   }
   l->print(); // should print: 0,2,4,6,8,10,12,14,16,18
-  assert(l->getSize() == 10);
+  assert(l->get_size() == 10);
 
   // the node to be removed should be a pred of the one being inserted
   // because hand locks are already acquired on the inserted node
@@ -42,7 +42,7 @@ int main() {
   ((MyList<int>*)l)->setValueToRemove(6);
   l->insert(11);
 
-  assert(l->getSize() == 10);
+  assert(l->get_size() == 10);
   l->print(); // should print: 0,2,4,8,11,12,14,16,17,18
   return 0;
 }
