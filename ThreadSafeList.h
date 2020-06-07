@@ -143,7 +143,10 @@ class List
          * @return current size of the list
          */
         unsigned int getSize() {
-			return size;
+            pthread_mutex_lock(&size_lock);
+            unsigned int size_t = size;
+            pthread_mutex_unlock(&size_lock);
+            return size_t;
         }
 
 		// Don't remove
