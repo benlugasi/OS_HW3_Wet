@@ -25,17 +25,15 @@ class Counter{
     unsigned int count;
 public:
     Counter(): count(0){};
-    Counter operator++(int){
+    void operator++(int){
         mutex.lock();
         count++;
         mutex.unlock();
-        return *this;
     };
-    Counter operator--(int){
+    void operator--(int){
         mutex.lock();
         count--;
         mutex.unlock();
-        return *this;
     };
     unsigned int get(){
         mutex.lock();
@@ -54,6 +52,7 @@ class List
             LOCK(&head);
             while(head.next)
                 remove(head.next->data);
+            UNLOCK(&head);
         }
 
         class Node {
@@ -84,32 +83,33 @@ class List
          * @return true if a new node was added and false otherwise
          */
         bool insert(const T& data) {
-            Node *pred= &head, *cur=head.next;
+            Node *pred= &head, *curr= nullptr;
             LOCK(pred);
-            LOCK(cur);
+            curr=head.next;
+            LOCK(curr);
             bool retval=false;
                 while (pred){
                     //Case 1: reach lists end --> insert to tail
-                    //Case 2: need to replace head (pred is dummy and data<cur)
-                    //Case 3: normal --> prev<data<cur
+                    //Case 2: need to replace head (pred is dummy and data<curr)
+                    //Case 3: normal --> prev<data<curr
 
-                    //   cur is tail       pred is dummy
-                    if (cur == nullptr || ((pred == &head || data > pred->data) && data < cur->data)) {
+                    //   curr is tail       pred is dummy
+                    if (curr == nullptr || ((pred == &head || data > pred->data) && data < curr->data)) {
                         retval= pred->insert_after(data);
                         break;
                     }
-                    else if (data == cur->data) {
+                    else if (data == curr->data) {
                         break;
                     }
-                    hand_over_hand(&pred, &cur);
+                    hand_over_hand(&pred, &curr);
                 }
 
             if(retval) {
                 size++;
                 __insert_test_hook();
             }
-            UNLOCK(cur);
             UNLOCK(pred);
+            UNLOCK(curr);
             return retval;
         }
 
@@ -119,8 +119,9 @@ class List
          * @return true if a matched node was found and removed and false otherwise
          */
         bool remove(const T& value) {
-            Node* pred = &head,* curr = head.next;
+            Node *pred= &head, *curr= nullptr;
             LOCK(pred);
+            curr=head.next;
             LOCK(curr);
             while (curr) {
                 if (curr->data == value) {
@@ -171,11 +172,17 @@ class List
         }
 
         bool isSorted(){
-            Node* temp = head.next;
-            while (temp->next != NULL) {
-                if(temp->data>temp->next->data)
+            Node *pred= &head, *curr= nullptr;
+            LOCK(pred);
+            curr=head.next;
+            LOCK(curr);
+            while (curr) {
+                if(pred!=&head && pred->data>curr->data)
                     return false;
+                hand_over_hand(&pred, &curr);
+
             }
+            UNLOCK(pred);
             return true;
         }
 
